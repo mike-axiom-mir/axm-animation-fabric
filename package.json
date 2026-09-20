@@ -4,6 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/selftest.mjs && node tests/additive-layer.mjs"
+    "test": "node tests/selftest.mjs && node tests/additive-layer.mjs && node tests/action-retime.mjs"
   }
 }
