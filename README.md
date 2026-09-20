@@ -16,7 +16,7 @@ The executable body supports named clips, phase windows, keyframed scalar/vector
 
 `sampleAdditiveLayer()` applies the difference between an additive clip's sampled pose and an explicit reference pose onto selected shared tracks of a base action. The caller controls weight from 0 to 1 and the exact tracks affected, so a recoil/flinch/attack accent can be layered without rewriting the base clip or root motion unless that track is deliberately selected. Additive sampling is pose-only: it does not merge or replay either clip's event stream.
 
-`retimeClip()` lives in `src/action-retime.mjs`. It derives a new clip identity at an explicit playback rate and scales duration, phase windows, keyframe times, and event times by the same factor. This lets one authored action produce deliberate faster/slower variants while keeping its internal motion/event alignment inspectable. It does not decide gameplay cooldowns, hit timing policy, balance, or whether a retimed action feels good.
+`retimeClip()` lives in `src/action-retime.mjs`. It derives a new clip identity at an explicit playback rate and scales duration, phase windows, keyframe times, and event times by the same factor. It now also emits an `axm.animation-time-transform/v1` receipt bound to the exact source clip hash, exact output clip hash, source/output durations, playback rate, and time scale. `mapSourceTime()` and `mapSourceInterval()` use that receipt to derive deterministic point/window timing evidence for downstream systems. This gives gameplay/ability code an explicit source-to-retimed timeline contract instead of requiring it to guess from animation duration or silently reuse source seconds. Animation Fabric still does not decide which gameplay hit/cancel/cue timings should be transformed; downstream gameplay policy owns that choice.
 
 ## Donor provenance
 
@@ -33,4 +33,4 @@ node examples/attack-move.mjs
 
 ## Truth boundary
 
-Passing structural and deterministic tests does not prove animation quality, physical plausibility, good posing, clean deformation, contact quality, collision correctness, or game feel. Those require rendered/runtime evidence and an explicit visual-review boundary.
+Passing structural and deterministic tests does not prove animation quality, physical plausibility, good posing, clean deformation, contact quality, collision correctness, gameplay timing policy, balance, or game feel. Those require rendered/runtime evidence and, where applicable, an explicit downstream gameplay decision and visual-review boundary.
