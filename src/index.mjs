@@ -62,6 +62,12 @@ function findTrack(clip, trackId) {
   return track;
 }
 
+function validateClipRange(clip, from, to) {
+  finite(from, "clip range from");
+  finite(to, "clip range to");
+  if (from < 0 || to > clip.duration || to < from) throw new Error("invalid clip range");
+}
+
 export function sampleTrack(track, time) {
   const keys = track.keys;
   if (!keys.length) throw new Error("track requires keys");
@@ -122,6 +128,62 @@ export function sampleClip(clip, time) {
   const values = Object.fromEntries((clip.tracks || []).map(track => [track.id, sampleTrack(track, t)]));
   const phases = (clip.phases || []).filter(p => t >= p.start && t < p.end).map(p => p.id);
   return { clip: clip.id, time: t, phases, values };
+}
+
+export function eventsBetween(clip, from, to, { includeFrom = from === 0, includeTo = true } = {}) {
+  validateClip(clip);
+  validateClipRange(clip, from, to);
+  if (typeof includeFrom !== "boolean" || typeof includeTo !== "boolean") {
+    throw new Error("event range inclusivity flags must be boolean");
+  }
+
+  const selected = (clip.events || []).filter(event => {
+    const afterStart = includeFrom ? event.time >= from : event.time > from;
+    const beforeEnd = includeTo ? event.time <= to : event.time < to;
+    return afterStart && beforeEnd;
+  });
+  return structuredClone(selected);
+}
+
+export function advanceClip(clip, {
+  from = 0,
+  to = clip.duration,
+  interruptAt = null,
+  includeFrom = from === 0
+} = {}) {
+  validateClip(clip);
+  validateClipRange(clip, from, to);
+  if (typeof includeFrom !== "boolean") throw new Error("includeFrom must be boolean");
+
+  let effectiveTo = to;
+  let interrupted = false;
+  if (interruptAt != null) {
+    finite(interruptAt, "interruptAt");
+    if (interruptAt < from || interruptAt > to) throw new Error("interruptAt must be inside the advance range");
+    effectiveTo = interruptAt;
+    interrupted = true;
+  }
+
+  const body = {
+    clip: clip.id,
+    from,
+    to,
+    effectiveTo,
+    interruptAt,
+    interrupted,
+    completed: !interrupted && effectiveTo === clip.duration,
+    events: eventsBetween(clip, from, effectiveTo, { includeFrom, includeTo: true }),
+    state: sampleClip(clip, effectiveTo)
+  };
+
+  return {
+    ...body,
+    receipt: {
+      sha256: digest(body),
+      deterministic: true,
+      cancelSafe: true
+    }
+  };
 }
 
 export function rootMotionDelta(clip, { trackId = "root.position", from = 0, to = clip.duration } = {}) {
