@@ -201,6 +201,25 @@ function blendTransitionValue(fromValue, toValue, alpha, label) {
   return lerp(fromValue, toValue, alpha);
 }
 
+function applyAdditiveValue(baseValue, layerValue, referenceValue, weight, label) {
+  const baseVector = Array.isArray(baseValue);
+  const layerVector = Array.isArray(layerValue);
+  const referenceVector = Array.isArray(referenceValue);
+  if (baseVector !== layerVector || layerVector !== referenceVector) throw new Error(label + " shape mismatch");
+  if (baseVector) {
+    if (baseValue.length !== layerValue.length || layerValue.length !== referenceValue.length) {
+      throw new Error(label + " shape mismatch");
+    }
+    return baseValue.map((value, index) =>
+      applyAdditiveValue(value, layerValue[index], referenceValue[index], weight, label + "[" + index + "]")
+    );
+  }
+  finite(baseValue, label + " base");
+  finite(layerValue, label + " layer");
+  finite(referenceValue, label + " reference");
+  return baseValue + (layerValue - referenceValue) * weight;
+}
+
 export function sampleClipTransition(fromClip, toClip, {
   fromTime = fromClip.duration,
   toTime = 0,
@@ -259,6 +278,74 @@ export function sampleClipTransition(fromClip, toClip, {
       sha256: digest(body),
       deterministic: true,
       poseBlendOnly: true
+    }
+  };
+}
+
+export function sampleAdditiveLayer(baseClip, additiveClip, {
+  baseTime = 0,
+  additiveTime = 0,
+  referenceTime = 0,
+  weight = 1,
+  trackIds = null
+} = {}) {
+  validateClip(baseClip);
+  validateClip(additiveClip);
+  finite(baseTime, "additive baseTime");
+  finite(additiveTime, "additive additiveTime");
+  finite(referenceTime, "additive referenceTime");
+  finite(weight, "additive weight");
+  if (baseTime < 0 || baseTime > baseClip.duration) throw new Error("additive baseTime must be inside base clip");
+  if (additiveTime < 0 || additiveTime > additiveClip.duration) throw new Error("additive additiveTime must be inside additive clip");
+  if (referenceTime < 0 || referenceTime > additiveClip.duration) throw new Error("additive referenceTime must be inside additive clip");
+  if (weight < 0 || weight > 1) throw new Error("additive weight must be between 0 and 1");
+
+  const baseState = sampleClip(baseClip, baseTime);
+  const additiveState = sampleClip(additiveClip, additiveTime);
+  const referenceState = sampleClip(additiveClip, referenceTime);
+  const additiveIds = new Set(Object.keys(additiveState.values));
+
+  let selected;
+  if (trackIds == null) {
+    selected = Object.keys(baseState.values).filter(id => additiveIds.has(id));
+    if (!selected.length) throw new Error("base and additive clips share no tracks");
+  } else {
+    if (!Array.isArray(trackIds) || !trackIds.length) throw new Error("trackIds must be a non-empty array");
+    if (new Set(trackIds).size !== trackIds.length) throw new Error("trackIds must not contain duplicates");
+    selected = [...trackIds];
+  }
+
+  const values = {};
+  for (const trackId of selected) {
+    if (typeof trackId !== "string" || !trackId) throw new Error("additive track id must be a non-empty string");
+    if (!(trackId in baseState.values) || !(trackId in additiveState.values) || !(trackId in referenceState.values)) {
+      throw new Error("additive track missing from one clip: " + trackId);
+    }
+    values[trackId] = applyAdditiveValue(
+      baseState.values[trackId],
+      additiveState.values[trackId],
+      referenceState.values[trackId],
+      weight,
+      "additive track " + trackId
+    );
+  }
+
+  const body = {
+    base: { clip: baseClip.id, time: baseTime, phases: baseState.phases },
+    additive: { clip: additiveClip.id, time: additiveTime, phases: additiveState.phases },
+    referenceTime,
+    weight,
+    trackIds: selected,
+    values
+  };
+
+  return {
+    ...body,
+    receipt: {
+      sha256: digest(body),
+      deterministic: true,
+      additivePoseOnly: true,
+      preservesSource: true
     }
   };
 }
