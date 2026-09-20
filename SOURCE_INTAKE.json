@@ -1,0 +1,14 @@
+{
+  "schema": "axm.source-intake/v1",
+  "repository": "mike-axiom-mir/axm-animation-fabric",
+  "donors": [{
+    "repository": "mike-axiom-mir/axm-collaboration-platform",
+    "commit": "c335244e9005df26c0edb99114164765addf6ed0",
+    "paths": [
+      "tools/character-animation-mocap-studio/",
+      "tools/p1-production-foundation/p1-kernel.mjs"
+    ],
+    "observed_contract": "axm.performance-set/v1"
+  }],
+  "runtime_dependency_on_donor": false
+}
