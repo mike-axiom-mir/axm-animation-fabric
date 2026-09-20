@@ -10,7 +10,9 @@ Initial canonical output remains compatible with the earlier donor contract:
 
 - `axm.performance-set/v1`
 
-The first executable body supports named clips, phase windows, keyframed scalar/vector tracks, root motion, joint/part tracks, exact timed animation events, deterministic sampling, replay validation, and inspectable receipts.
+The executable body supports named clips, phase windows, keyframed scalar/vector tracks, root motion, joint/part tracks, exact timed animation events, deterministic sampling, replay validation, inspectable receipts, root-motion distance warping, and cancel-safe clip advancement that emits only events actually crossed before an interruption boundary.
+
+`advanceClip()` is intended for game-action playback where a clip may be cancelled or interrupted mid-step. It returns the sampled state at the effective stop time plus deterministic event evidence for that interval. It does not decide whether a gameplay cancel is allowed; that policy belongs to the gameplay/ability layer.
 
 ## Donor provenance
 
@@ -27,4 +29,4 @@ node examples/attack-move.mjs
 
 ## Truth boundary
 
-Passing structural and deterministic tests does not prove animation quality, physical plausibility, good posing, clean deformation, or game feel. Those require rendered/runtime evidence and an explicit visual-review boundary.
+Passing structural and deterministic tests does not prove animation quality, physical plausibility, good posing, clean deformation, contact quality, collision correctness, or game feel. Those require rendered/runtime evidence and an explicit visual-review boundary.
