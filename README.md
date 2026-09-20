@@ -10,9 +10,11 @@ Initial canonical output remains compatible with the earlier donor contract:
 
 - `axm.performance-set/v1`
 
-The executable body supports named clips, phase windows, keyframed scalar/vector tracks, root motion, joint/part tracks, exact timed animation events, deterministic sampling, replay validation, inspectable receipts, root-motion distance warping, and cancel-safe clip advancement that emits only events actually crossed before an interruption boundary.
+The executable body supports named clips, phase windows, keyframed scalar/vector tracks, root motion, joint/part tracks, exact timed animation events, deterministic sampling, replay validation, inspectable receipts, root-motion distance warping, cancel-safe clip advancement, cancel-transition pose blending, and deterministic additive pose layers for action accents such as recoil or upper-body attack motion.
 
 `advanceClip()` is intended for game-action playback where a clip may be cancelled or interrupted mid-step. It returns the sampled state at the effective stop time plus deterministic event evidence for that interval. It does not decide whether a gameplay cancel is allowed; that policy belongs to the gameplay/ability layer.
+
+`sampleAdditiveLayer()` applies the difference between an additive clip's sampled pose and an explicit reference pose onto selected shared tracks of a base action. The caller controls weight from 0 to 1 and the exact tracks affected, so a recoil/flinch/attack accent can be layered without rewriting the base clip or root motion unless that track is deliberately selected. Additive sampling is pose-only: it does not merge or replay either clip's event stream.
 
 ## Donor provenance
 
