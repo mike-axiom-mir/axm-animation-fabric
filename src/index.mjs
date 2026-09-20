@@ -186,6 +186,83 @@ export function advanceClip(clip, {
   };
 }
 
+function blendTransitionValue(fromValue, toValue, alpha, label) {
+  const fromVector = Array.isArray(fromValue);
+  const toVector = Array.isArray(toValue);
+  if (fromVector !== toVector) throw new Error(label + " shape mismatch");
+  if (fromVector) {
+    if (fromValue.length !== toValue.length) throw new Error(label + " shape mismatch");
+    return fromValue.map((value, index) =>
+      blendTransitionValue(value, toValue[index], alpha, label + "[" + index + "]")
+    );
+  }
+  finite(fromValue, label + " from");
+  finite(toValue, label + " to");
+  return lerp(fromValue, toValue, alpha);
+}
+
+export function sampleClipTransition(fromClip, toClip, {
+  fromTime = fromClip.duration,
+  toTime = 0,
+  alpha,
+  trackIds = null
+} = {}) {
+  validateClip(fromClip);
+  validateClip(toClip);
+  finite(fromTime, "transition fromTime");
+  finite(toTime, "transition toTime");
+  finite(alpha, "transition alpha");
+  if (fromTime < 0 || fromTime > fromClip.duration) throw new Error("transition fromTime must be inside source clip");
+  if (toTime < 0 || toTime > toClip.duration) throw new Error("transition toTime must be inside target clip");
+  if (alpha < 0 || alpha > 1) throw new Error("transition alpha must be between 0 and 1");
+
+  const fromState = sampleClip(fromClip, fromTime);
+  const toState = sampleClip(toClip, toTime);
+  const fromIds = Object.keys(fromState.values);
+  const toIds = new Set(Object.keys(toState.values));
+
+  let selected;
+  if (trackIds == null) {
+    selected = fromIds.filter(id => toIds.has(id));
+    if (!selected.length) throw new Error("transition clips share no tracks");
+  } else {
+    if (!Array.isArray(trackIds) || !trackIds.length) throw new Error("trackIds must be a non-empty array");
+    if (new Set(trackIds).size !== trackIds.length) throw new Error("trackIds must not contain duplicates");
+    selected = [...trackIds];
+  }
+
+  const values = {};
+  for (const trackId of selected) {
+    if (typeof trackId !== "string" || !trackId) throw new Error("transition track id must be a non-empty string");
+    if (!(trackId in fromState.values) || !(trackId in toState.values)) {
+      throw new Error("transition track missing from one clip: " + trackId);
+    }
+    values[trackId] = blendTransitionValue(
+      fromState.values[trackId],
+      toState.values[trackId],
+      alpha,
+      "transition track " + trackId
+    );
+  }
+
+  const body = {
+    from: { clip: fromClip.id, time: fromTime, phases: fromState.phases },
+    to: { clip: toClip.id, time: toTime, phases: toState.phases },
+    alpha,
+    trackIds: selected,
+    values
+  };
+
+  return {
+    ...body,
+    receipt: {
+      sha256: digest(body),
+      deterministic: true,
+      poseBlendOnly: true
+    }
+  };
+}
+
 export function rootMotionDelta(clip, { trackId = "root.position", from = 0, to = clip.duration } = {}) {
   validateClip(clip);
   finite(from, "root-motion from");
